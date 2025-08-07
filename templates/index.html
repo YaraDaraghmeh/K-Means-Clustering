@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive K-Means Clustering - Flask App</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #4a5568;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        input, select, button {
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .visualization {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .visualization {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .plot-container {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .plot-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .algorithm-steps {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .step {
+            background: white;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .step.active {
+            background: #e6f3ff;
+            border-left-color: #2d3748;
+        }
+
+        .results {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e2e8f0;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .explanation {
+            background: #e6f3ff;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #667eea;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        .history {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .iteration-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border-left: 3px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 Interactive K-Means Clustering</h1>
+
+        <div class="explanation">
+            <h3>🎯 About K-Means Clustering</h3>
+            <p>K-Means is an unsupervised machine learning algorithm that partitions data into k clusters. This Flask application demonstrates the algorithm step-by-step with real-time visualizations and detailed statistics!</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="k-value">🎯 Number of Clusters (k):</label>
+                <input type="number" id="k-value" min="1" max="8" value="3">
+            </div>
+
+            <div class="control-group">
+                <label for="num-points">📊 Number of Data Points:</label>
+                <input type="number" id="num-points" min="10" max="100" value="30">
+            </div>
+
+            <div class="control-group">
+                <label for="init-method">🎲 Initialization Method:</label>
+                <select id="init-method">
+                    <option value="random">Random</option>
+                    <option value="kmeans++">K-Means++</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="max-iterations">🔄 Max Iterations:</label>
+                <input type="number" id="max-iterations" min="1" max="50" value="20">
+            </div>
+
+            <div class="control-group">
+                <button onclick="generateData()">🎲 Generate Random Data</button>
+            </div>
+
+            <div class="control-group">
+                <button onclick="initializeCentroids()">🎯 Initialize Centroids</button>
+            </div>
+
+            <div class="control-group">
+                <button onclick="runStep()">⏭️ Run One Step</button>
+            </div>
+
+            <div class="control-group">
+                <button onclick="runFull()">🚀 Run Full Algorithm</button>
+            </div>
+
+            <div class="control-group">
+                <button onclick="compareMethods()">⚖️ Compare Methods</button>
+            </div>
+
+            <div class="control-group">
+                <button onclick="reset()">🔄 Reset</button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            🔄 Processing...
+        </div>
+
+        <div class="visualization">
+            <div class="plot-container">
+                <h3>📈 Data Visualization</h3>
+                <div id="plot-display">
+                    <p>Click "Generate Random Data" to start</p>
+                </div>
+            </div>
+
+            <div class="algorithm-steps">
+                <h3>📋 Algorithm Steps</h3>
+                <div id="steps-container">
+                    <div class="step" id="step-1">
+                        <strong>Step 1:</strong> Initialize k centroids randomly or using K-means++
+                    </div>
+                    <div class="step" id="step-2">
+                        <strong>Step 2:</strong> Assign each point to nearest centroid
+                    </div>
+                    <div class="step" id="step-3">
+                        <strong>Step 3:</strong> Update centroids to cluster means
+                    </div>
+                    <div class="step" id="step-4">
+                        <strong>Step 4:</strong> Repeat until convergence
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="results">
+            <h3>📊 Clustering Results</h3>
+            <div class="stats" id="stats-container">
+                <div class="stat-card">
+                    <div class="stat-value" id="iterations-count">0</div>
+                    <div class="stat-label">Iterations</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="inertia-value">0</div>
+                    <div class="stat-label">Inertia (WCSS)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="convergence-status">Not Started</div>
+                    <div class="stat-label">Status</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="num-points-display">0</div>
+                    <div class="stat-label">Data Points</div>
+                </div>
+            </div>
+            <div id="detailed-results"></div>
+        </div>
+
+        <div class="history">
+            <h3>📜 Iteration History</h3>
+            <div id="history-container">
+                <p>Run the algorithm to see iteration history</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentResults = null;
+        let isRunning = false;
+
+        function showLoading(show = true) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function updateStats(results) {
+            if (!results) return;
+
+            document.getElementById('iterations-count').textContent = results.iteration || 0;
+            document.getElementById('inertia-value').textContent = results.inertia || 0;
+            document.getElementById('convergence-status').textContent =
+                results.converged ? 'Converged ✅' :
+                results.iteration > 0 ? 'Running 🔄' : 'Not Started ⏹️';
+            document.getElementById('num-points-display').textContent =
+                results.data_points ? results.data_points.length : 0;
+        }
+
+        function updateDetailedResults(results) {
+            if (!results || !results.centroids) return;
+
+            const container = document.getElementById('detailed-results');
+            let html = '<h4>🎯 Cluster Details:</h4>';
+
+            for (let i = 0; i < results.centroids.length; i++) {
+                const pointsInCluster = results.labels ?
+                    results.labels.filter(label => label === i).length : 0;
+
+                html += `<div style="margin: 10px 0; padding: 15px; background: white; border-radius: 8px; border-left: 4px solid hsl(${i * 60}, 70%, 60%)">
+                    <strong>Cluster ${i}:</strong> ${pointsInCluster} points<br>
+                    <strong>Centroid:</strong> (${results.centroids[i][0].toFixed(1)}, ${results.centroids[i][1].toFixed(1)})
+                </div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function updateHistory(results) {
+            if (!results || !results.history) return;
+
+            const container = document.getElementById('history-container');
+            let html = '';
+
+            results.history.forEach((iteration, index) => {
+                html += `<div class="iteration-item">
+                    <strong>Iteration ${iteration.iteration}:</strong>
+                    Inertia: ${iteration.inertia}
+                    ${iteration.iteration === results.iteration ? '← Current' : ''}
+                </div>`;
+            });
+
+            container.innerHTML = html || '<p>No history available</p>';
+        }
+
+        function updatePlot() {
+            fetch('/get_plot')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.plot) {
+                        document.getElementById('plot-display').innerHTML =
+                            `<img src="data:image/png;base64,${data.plot}" class="plot-image" alt="K-Means Plot">`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating plot:', error);
+                });
+        }
+
+        function generateData() {
+            if (isRunning) return;
+
+            showLoading(true);
+            const nPoints = parseInt(document.getElementById('num-points').value);
+            const k = parseInt(document.getElementById('k-value').value);
+
+            fetch('/generate_data', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    n_points: nPoints,
+                    n_centers: Math.min(k, 5)  // Don't generate too many natural clusters
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updatePlot();
+                    updateStats({data_points: data.data_points});
+                    document.getElementById('detailed-results').innerHTML = '<p>Click "Initialize Centroids" to start clustering</p>';
+                    document.getElementById('history-container').innerHTML = '<p>Run the algorithm to see iteration history</p>';
+                }
+                showLoading(false);
+            })
+            .catch(error => {
+                console.error('Error generating data:', error);
+                showLoading(false);
+            });
+        }
+
+        function initializeCentroids() {
+            if (isRunning) return;
+
+            showLoading(true);
+            const k = parseInt(document.getElementById('k-value').value);
+            const method = document.getElementById('init-method').value;
+
+            fetch('/initialize_centroids', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({k: k, method: method})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updatePlot();
+                    highlightStep(1);
+                }
+                showLoading(false);
+            })
+            .catch(error => {
+                console.error('Error initializing centroids:', error);
+                showLoading(false);
+            });
+        }
+
+        function runStep() {
+            if (isRunning) return;
+
+            showLoading(true);
+
+            fetch('/run_step', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentResults = data.results;
+                    updateStats(currentResults);
+                    updateDetailedResults(currentResults);
+                    updateHistory(currentResults);
+                    updatePlot();
+
+                    if (data.converged) {
+                        highlightStep(4);
+                    } else {
+                        highlightStep(currentResults.iteration % 2 === 1 ? 2 : 3);
+                    }
+                }
+                showLoading(false);
+            })
+            .catch(error => {
+                console.error('Error running step:', error);
+                showLoading(false);
+            });
+        }
+
+        function runFull() {
+            if (isRunning) return;
+
+            isRunning = true;
+            showLoading(true);
+
+            const k = parseInt(document.getElementById('k-value').value);
+            const maxIterations = parseInt(document.getElementById('max-iterations').value);
+            const initMethod = document.getElementById('init-method').value;
+
+            fetch('/run_full', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    k: k,
+                    max_iterations: maxIterations,
+                    init_method: initMethod
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentResults = data.results;
+                    updateStats(currentResults);
+                    updateDetailedResults(currentResults);
+                    updateHistory(currentResults);
+                    updatePlot();
+                    highlightStep(4);
+                }
+                showLoading(false);
+                isRunning = false;
+            })
+            .catch(error => {
+                console.error('Error running full algorithm:', error);
+                showLoading(false);
+                isRunning = false;
+            });
+        }
+
+        function compareMethods() {
+            if (isRunning) return;
+
+            isRunning = true;
+            showLoading(true);
+
+            const k = parseInt(document.getElementById('k-value').value);
+            const maxIterations = parseInt(document.getElementById('max-iterations').value);
+
+            fetch('/compare_methods', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    k: k,
+                    max_iterations: maxIterations
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const comparison = data.comparison;
+                    let html = '<h4>🆚 Method Comparison:</h4>';
+
+                    html += `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0;">`;
+
+                    html += `<div style="background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #ff6b6b;">
+                        <strong>Random Initialization</strong><br>
+                        Iterations: ${comparison.random.iteration}<br>
+                        Inertia: ${comparison.random.inertia}<br>
+                        Converged: ${comparison.random.converged ? 'Yes' : 'No'}
+                    </div>`;
+
+                    html += `<div style="background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #4ecdc4;">
+                        <strong>K-Means++ Initialization</strong><br>
+                        Iterations: ${comparison['kmeans++'].iteration}<br>
+                        Inertia: ${comparison['kmeans++'].inertia}<br>
+                        Converged: ${comparison['kmeans++'].converged ? 'Yes' : 'No'}
+                    </div>`;
+
+                    html += `</div>`;
+
+                    const winner = comparison.random.inertia < comparison['kmeans++'].inertia ? 'Random' : 'K-Means++';
+                    html += `<p><strong>🏆 Better Result:</strong> ${winner} (lower inertia is better)</p>`;
+
+                    document.getElementById('detailed-results').innerHTML = html;
+
+                    // Show the K-Means++ result
+                    currentResults = comparison['kmeans++'];
+                    updateStats(currentResults);
+                    updateHistory(currentResults);
+                    updatePlot();
+                }
+                showLoading(false);
+                isRunning = false;
+            })
+            .catch(error => {
+                console.error('Error comparing methods:', error);
+                showLoading(false);
+                isRunning = false;
+            });
+        }
+
+        function reset() {
+            if (isRunning) return;
+
+            fetch('/reset', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentResults = null;
+                    updateStats({});
+                    updatePlot();
+                    document.querySelectorAll('.step').forEach(step => step.classList.remove('active'));
+                    document.getElementById('detailed-results').innerHTML = '<p>Reset complete. Generate data and run algorithm.</p>';
+                    document.getElementById('history-container').innerHTML = '<p>Run the algorithm to see iteration history</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error resetting:', error);
+            });
+        }
+
+        function highlightStep(stepNumber) {
+            document.querySelectorAll('.step').forEach(step => step.classList.remove('active'));
+            if (stepNumber) {
+                document.getElementById(`step-${stepNumber}`).classList.add('active');
+            }
+        }
+
+        // Initialize with some data
+        window.onload = function() {
+            generateData();
+        };
+    </script>
+</body>
+</html>
